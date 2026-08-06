@@ -1,81 +1,100 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { isCacheablePublicPath, updateSession } from "./lib/supabase/proxy";
-import { rateLimit } from "./lib/security/rate-limit";
+export type TrustControlStatus = "implemented" | "configuration" | "operational" | "upgrade";
 
-function contentSecurityPolicy(nonce: string | null, relaxedScripts: boolean) {
-  const extraConnect = process.env.CSP_CONNECT_SRC?.split(",").map((value) => value.trim()).filter(Boolean).join(" ") ?? "";
-  const scriptPolicy = relaxedScripts ? "'self' 'unsafe-inline'" : `'self' 'nonce-${nonce}' 'strict-dynamic'`;
-  return [
-    "default-src 'self'",
-    `script-src ${scriptPolicy}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.googleusercontent.com https://www.ethiotelecom.et",
-    "font-src 'self' data:",
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${extraConnect}`.trim(),
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "object-src 'none'",
-    "upgrade-insecure-requests",
-  ].join("; ");
-}
+export type TrustControl = {
+  number: string;
+  title: string;
+  status: TrustControlStatus;
+  statusLabel: string;
+  description: string;
+  evidence: string;
+};
 
-function securityHeaders(response: NextResponse, csp: string, nonce: string | null) {
-  response.headers.set("Content-Security-Policy", csp);
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-  if (nonce) response.headers.set("x-nonce", nonce);
-  else response.headers.delete("x-nonce");
-  return response;
-}
+export const trustControls: TrustControl[] = [
+  {
+    number: "01",
+    title: "Privileged administrator MFA",
+    status: "implemented",
+    statusLabel: "Implemented",
+    description: "Owner and administrator mutations require an AAL2 authenticator session before sensitive financial, inventory, payroll, user or security changes are accepted.",
+    evidence: "Enforced in the application session and PostgreSQL control path.",
+  },
+  {
+    number: "02",
+    title: "Organization and role boundaries",
+    status: "implemented",
+    statusLabel: "Implemented",
+    description: "Workspace access is scoped by organization and role so operational users do not automatically receive administrator-level control.",
+    evidence: "Production health checks include detection of public tables that are missing row-level security.",
+  },
+  {
+    number: "03",
+    title: "Business and authentication audit trails",
+    status: "implemented",
+    statusLabel: "Implemented",
+    description: "Material financial actions, authentication activity and security alerts can be recorded as organization-scoped audit events.",
+    evidence: "MFA-verified administrators can export enabled audit streams as spreadsheet-safe CSV evidence.",
+  },
+  {
+    number: "04",
+    title: "Browser and application security headers",
+    status: "implemented",
+    statusLabel: "Implemented",
+    description: "Responses apply a restrictive content security policy, frame protection, MIME-type protection, referrer controls and permissions restrictions.",
+    evidence: "Security headers are applied centrally by the Next.js request proxy.",
+  },
+  {
+    number: "05",
+    title: "Sensitive-route rate limiting",
+    status: "operational",
+    statusLabel: "Baseline control",
+    description: "Authentication and API routes use fixed-window request limits as a baseline against repeated automated requests.",
+    evidence: "The current in-memory limiter is a fallback and should be replaced with a shared regional limiter as deployment scale increases.",
+  },
+  {
+    number: "06",
+    title: "Leaked-password screening",
+    status: "implemented",
+    statusLabel: "Implemented",
+    description: "New and reset passwords are screened for predictable patterns and checked through a privacy-preserving breach-prefix lookup.",
+    evidence: "Only a short hash prefix is sent to the breach lookup service; the password itself is not transmitted.",
+  },
+  {
+    number: "07",
+    title: "Backup and restore evidence",
+    status: "operational",
+    statusLabel: "Operational process",
+    description: "Administrators can record encrypted backup evidence, checksums, storage references and isolated restore-test results.",
+    evidence: "Readiness depends on the organization keeping backup evidence current and performing periodic restore tests.",
+  },
+  {
+    number: "08",
+    title: "Error-monitoring webhook",
+    status: "configuration",
+    statusLabel: "Configuration-ready",
+    description: "Structured server errors can be logged by the hosting platform and forwarded to an external monitoring endpoint.",
+    evidence: "External forwarding requires the monitoring webhook environment variable to be configured.",
+  },
+  {
+    number: "09",
+    title: "Point-in-time recovery",
+    status: "upgrade",
+    statusLabel: "Platform upgrade required",
+    description: "Point-in-time recovery is intentionally not presented as active until the connected database plan confirms the capability.",
+    evidence: "The production controls page keeps this state visible rather than marking an unavailable safeguard as ready.",
+  },
+];
 
-function hasSupabaseSessionCookie(request: NextRequest) {
-  return request.cookies.getAll().some(({ name }) => /^sb-.+-auth-token(?:\.\d+)?$/.test(name));
-}
-
-export async function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const isLegacy = path.startsWith("/legacy");
-  const cacheablePublic = isCacheablePublicPath(path) && !(path === "/" && hasSupabaseSessionCookie(request));
-  const relaxedScripts = isLegacy || cacheablePublic;
-  const nonce = relaxedScripts ? null : crypto.randomUUID().replaceAll("-", "");
-  const csp = contentSecurityPolicy(nonce, relaxedScripts);
-  const isSensitive = path.startsWith("/auth/") || path.startsWith("/api/");
-
-  if (isSensitive) {
-    const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-    const key = `${forwarded || "unknown"}:${path}`;
-    const result = rateLimit(key, path.startsWith("/auth/") ? 12 : 60);
-    if (!result.allowed) {
-      const response = NextResponse.json({ error: "Too many requests. Please try again shortly." }, { status: 429 });
-      response.headers.set("Retry-After", String(Math.ceil((result.resetAt - Date.now()) / 1000)));
-      return securityHeaders(response, csp, nonce);
-    }
-  }
-
-  // Anonymous marketing and metadata requests bypass session middleware entirely.
-  // They use a static CSP without a per-request nonce so Vercel can cache the
-  // rendered response at the CDN instead of forcing dynamic rendering.
-  if (cacheablePublic && request.method === "GET") {
-    const response = NextResponse.next();
-    response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400");
-    return securityHeaders(response, csp, null);
-  }
-
-  const requestHeaders = new Headers(request.headers);
-  if (nonce) requestHeaders.set("x-nonce", nonce);
-  else requestHeaders.delete("x-nonce");
-  requestHeaders.set("Content-Security-Policy", csp);
-  const response = await updateSession(request, requestHeaders);
-
-  return securityHeaders(response, csp, nonce);
-}
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2|css|js|mjs|map|webmanifest)$).*)",
+export const sharedResponsibility = {
+  hisab: [
+    "Maintain application access controls and secure-by-default product behavior.",
+    "Apply security headers and protect sensitive authentication and API routes.",
+    "Provide administrator MFA, audit evidence, alerts and production-control workflows.",
+    "Communicate configuration requirements and avoid presenting planned controls as active.",
+  ],
+  customer: [
+    "Assign the minimum required role to each user and remove access when responsibilities change.",
+    "Require administrators to complete MFA and protect recovery methods.",
+    "Review alerts, audit activity, backup evidence and restore-test status regularly.",
+    "Protect exported data, devices, passwords and third-party integration credentials.",
   ],
 };
