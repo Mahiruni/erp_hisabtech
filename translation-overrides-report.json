@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-08-06T00:21:03.827Z",
+  "appliedOverrides": [
+    {
+      "source": "Validate period locks, balanced journals, audit exports, record retention, backups and restore evidence.",
+      "from": "ui-catalog-06.json[51]",
+      "to": "ui-catalog-07.json[0]",
+      "reviewNote": "Corrects the Amharic meaning of audit data export."
+    }
+  ]
+}
