@@ -9,16 +9,7 @@ import { WorkspaceShell } from "../components/workspace-shell";
 
 /* ------------------------------------------------------------------
    Stylesheets
-   ------------------------------------------------------------------
-   The public marketing site no longer loads anything here — it owns
-   a single stylesheet (app/hisab-marketing.css) imported by the
-   marketing chrome. Everything below belongs to the authenticated
-   workspace and the auth routes.
-
-   Do not add "-fix", "-lock" or "-final" stylesheets to this list.
    ------------------------------------------------------------------ */
-
-/* Foundation */
 import "./fonts.css";
 import "./globals.css";
 import "./design-system.css";
@@ -29,6 +20,7 @@ import "./production.css";
 import "./font-benaiah-1.css";
 import "./font-benaiah-2.css";
 import "./font-benaiah-3.css";
+import "./hisab-brand.css";
 
 /* Auth routes */
 import "./auth-i18n.css";
@@ -63,7 +55,7 @@ import "./biloo-all-workspace-routes-contrast-lock.css";
 import "./biloo-workspace-utility-visibility-lock.css";
 import "./biloo-pure-white-workspace-lock.css";
 
-/* Theme guards — load before the workspace colour authority below */
+/* Theme guards */
 import "./light-theme-contrast.css";
 import "./light-theme-component-guards.css";
 
@@ -86,15 +78,6 @@ import "./readiness.css";
 import "./product-experience.css";
 import "./brand-refinements.css";
 import "./brand-loading.css";
-
-/* ------------------------------------------------------------------
-   Typography
-   ------------------------------------------------------------------
-   Archivo carries headings, Public Sans carries body copy, and
-   IBM Plex Mono carries every figure that means something — money,
-   document numbers, account codes. The --font-biloo-* aliases keep
-   the older workspace stylesheets resolving.
-   ------------------------------------------------------------------ */
 
 const display = Archivo({
   subsets: ["latin"],
@@ -123,28 +106,19 @@ const mono = IBM_Plex_Mono({
   fallback: ["ui-monospace", "SFMono-Regular", "monospace"],
 });
 
-/* Restores the reader's theme and language before first paint so the
-   page does not flash the wrong one. */
 const preferenceBootstrap = `
 (function () {
   var root = document.documentElement;
-
   function readCookie(name) {
     var prefix = name + '=';
-    var match = document.cookie
-      .split(';')
-      .map(function (value) { return value.trim(); })
-      .find(function (value) { return value.indexOf(prefix) === 0; });
+    var match = document.cookie.split(';').map(function (value) { return value.trim(); }).find(function (value) { return value.indexOf(prefix) === 0; });
     return match ? decodeURIComponent(match.slice(prefix.length)) : '';
   }
-
   try {
     var storedTheme = window.localStorage.getItem('hisab-theme') || readCookie('hisab_theme');
     var storedLanguage = window.localStorage.getItem('hisab-erp-language') || readCookie('hisab_locale');
-
     var theme = storedTheme === 'dark' ? 'dark' : 'light';
     var language = storedLanguage === 'am' ? 'am' : storedLanguage === 'ti' ? 'ti' : 'en';
-
     root.dataset.theme = theme;
     root.dataset.language = language;
     root.lang = language;
@@ -163,18 +137,9 @@ export const metadata: Metadata = {
     default: "Hisab ERP — Business operating system for Ethiopia",
     template: "%s | Hisab ERP",
   },
-  description:
-    "Hisab ERP connects sales, finance, inventory, customers, suppliers and reporting to one double-entry ledger, built in Addis Ababa for Ethiopian businesses.",
+  description: "Hisab ERP connects sales, finance, inventory, customers, suppliers and reporting to one double-entry ledger, built in Addis Ababa for Ethiopian businesses.",
   applicationName: "Hisab ERP",
-  keywords: [
-    "Hisab ERP",
-    "ERP Ethiopia",
-    "accounting software Ethiopia",
-    "VAT Ethiopia",
-    "inventory management",
-    "invoicing",
-    "Addis Ababa software",
-  ],
+  keywords: ["Hisab ERP", "ERP Ethiopia", "accounting software Ethiopia", "VAT Ethiopia", "inventory management", "invoicing", "Addis Ababa software"],
   authors: [{ name: "Hisab Technologies", url: "https://www.hisabtech.com/about" }],
   creator: "Hisab Technologies",
   publisher: "Hisab Technologies",
@@ -184,57 +149,28 @@ export const metadata: Metadata = {
     locale: "en_ET",
     siteName: "Hisab ERP",
     title: "Hisab ERP — Business operating system for Ethiopia",
-    description:
-      "One connected workspace for sales, finance, inventory, customers, suppliers and reporting.",
+    description: "One connected workspace for sales, finance, inventory, customers, suppliers and reporting.",
     url: "/",
     images: [{ url: "/hisab-logo.svg", width: 512, height: 512, alt: "Hisab ERP" }],
   },
-  twitter: {
-    card: "summary",
-    title: "Hisab ERP",
-    description: "Business operating system for growing Ethiopian organisations.",
-    images: ["/hisab-logo.svg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
-  },
-  icons: {
-    icon: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }],
-    shortcut: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }],
-  },
+  twitter: { card: "summary", title: "Hisab ERP", description: "Business operating system for growing Ethiopian organisations.", images: ["/hisab-logo.svg"] },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
+  icons: { icon: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }], shortcut: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }], apple: [{ url: "/hisab-logo.svg", type: "image/svg+xml" }] },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  /* Pinch-zoom stays available. The previous build locked
-     maximum-scale to 1, which blocks readers who need to zoom. */
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
-  themeColor: "#0b1220",
-  colorScheme: "light",
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html
-      className={`${display.variable} ${body.variable} ${mono.variable}`}
-      lang="en"
-      data-language="en"
-      data-theme="light"
-      data-brand="hisab"
-      suppressHydrationWarning
-    >
+    <html className={`${display.variable} ${body.variable} ${mono.variable}`} lang="en" data-language="en" data-theme="dark" data-brand="hisab" suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href="/biloo-workspace-utility-header.css?v=20260806-1" />
         <script dangerouslySetInnerHTML={{ __html: preferenceBootstrap }} />
